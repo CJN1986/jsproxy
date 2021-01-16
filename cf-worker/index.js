@@ -41,6 +41,40 @@ function newUrl(urlStr) {
   }
 }
 
+// Auth
+const openAuth = true
+const username = 'nema'
+const password = 'passworb'
+
+function unauthorized() {
+  return new Response('Unauthorized', {
+    headers: {
+      'WWW-Authenticate': 'Basic realm="Nginx"',
+      'Access-Control-Allow-Origin': '*'
+    },
+    status: 401
+  });
+}
+
+function parseBasicAuth(auth) {
+    try {
+      return atob(auth.split(' ').pop()).split(':');
+    } catch (e) {
+      return [];
+    }
+}
+
+function doBasicAuth(request) {
+  const auth = request.headers.get('Authorization');
+
+  if (!auth || !/^Basic [A-Za-z0-9._~+/-]+=*$/i.test(auth)) {
+    return false;
+  }
+  
+  const [user, pass] = parseBasicAuth(auth);
+  return user === username && pass === password;
+}
+
 
 addEventListener('fetch', e => {
   const ret = fetchHandler(e)
@@ -53,6 +87,20 @@ addEventListener('fetch', e => {
  * @param {FetchEvent} e 
  */
 async function fetchHandler(e) {
+  if (e.request.method === 'OPTIONS') // allow preflight request
+    return new Response('', {
+      status: 200,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': '*',
+        'Access-Control-Allow-Methods': 'GET, POST, PUT, HEAD, OPTIONS'
+      }
+    });
+
+  if (openAuth && !doBasicAuth(e.request)) {
+    return unauthorized();
+  }
+    
   const req = e.request
   const urlStr = req.url
   const urlObj = new URL(urlStr)
